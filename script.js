@@ -18,6 +18,8 @@ var scene = new THREE.Scene();
 // create a camera, which defines where we're looking at.
 var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 20000);
 
+var reset_count = 0
+
 
 // create a render and set the size
 var webGLRenderer = new THREE.WebGLRenderer();
@@ -26,8 +28,8 @@ webGLRenderer.setSize(window.innerWidth, window.innerHeight);
 //webGLRenderer.shadowMapEnablede= true;
 
 // position and point the .to the center of the scene
-camera.position.z = -20;
-camera.position.y = -300;
+camera.position.z = 0;
+camera.position.x = 1;
 camera.lookAt(new THREE.Vector3(0, 0, 0));
 
 
@@ -79,9 +81,10 @@ var controls = new function () {
 var mesh;
 
 var cubes_pos = [];
-var mirrorSphere, mirrorSphereCamera; // for mirror material
-var ocean, cubes, mirror,skybox;
-var geometry, material, ms_Water, aMeshMirror;
+var mirrorSpheres, mirrorSphereCamera; // for mirror material
+var mirrorSphereMaterial
+var ocean, cubes, mirror,skybox, skybox2;
+var geometry, material, ms_Water, water_plane;
 
 var loader = new THREE.OBJMTLLoader();
 var load = function (object) {
@@ -100,18 +103,28 @@ init_water();
 init_cubes();
 init_skybox();
 //init_mirrors();
-init_mirror_sphere();
+init_mirror_spheres();
 
-function init_mirror_sphere() {
-	var sphereGeom =  new THREE.SphereGeometry( 50, 32, 16 ); // radius, segmentsWidth, segmentsHeight
+function init_mirror_spheres() {
+	mirrorSpheres = []
+
 	mirrorSphereCamera = new THREE.CubeCamera( 0.1, 5000, 512 );
+
+	var n_spheres = 4
+
+	mirrorSphereMaterial = new THREE.MeshBasicMaterial( { envMap: mirrorSphereCamera.renderTarget } );
+
+	for (i=0;i < n_spheres; i++) {
+		var sphereGeom =  new THREE.SphereGeometry( Math.pow(10,i+1), 32, 16 ); // radius, segmentsWidth, segmentsHeight
+		var sphereMesh =  new THREE.Mesh( sphereGeom, mirrorSphereMaterial );
+		sphereMesh.position.set(0,0,0);
+		scene.add(sphereMesh)
+		mirrorSpheres.push( sphereMesh );
+
+		mirrorSphereCamera.position = sphereMesh.position;
+	}
 	// mirrorCubeCamera.renderTarget.minFilter = THREE.LinearMipMapLinearFilter;
 	scene.add( mirrorSphereCamera );
-	var mirrorSphereMaterial = new THREE.MeshBasicMaterial( { envMap: mirrorSphereCamera.renderTarget } );
-	mirrorSphere = new THREE.Mesh( sphereGeom, mirrorSphereMaterial );
-	mirrorSphere.position.set(0,0,-40);
-	mirrorSphereCamera.position = mirrorSphere.position;
-	scene.add(mirrorSphere);
 }
 
 function init_mirrors() {
@@ -147,24 +160,34 @@ function init_water() {
 		alpha:  1.,
 		sunDirection: directionalLight.position.normalize(),
 		sunColor: 0xffffff,
-		waterColor: 0x000,
+		waterColor: 0xffffff,
 		betaVersion: 0,
 		distortionScale: 50.0,
 		side: THREE.DoubleSide
 	});
 
+	var s = 1000
+	var wps = [];	
 
-	aMeshMirror = new THREE.Mesh(
-		new THREE.PlaneBufferGeometry(1000, 1000, 10, 10),
-		ms_Water.material
-	);
-	aMeshMirror.add(ms_Water);
-	//aMeshMirror.rotation.z = Math.PI * 0.2;
-	//aMeshMirror.rotation.x = - Math.PI * 0.5;
-	//
-	aMeshMirror.position.z = -30
 
-	scene.add(aMeshMirror);
+	var n = 1;
+	for (i=0;i<n;i++) {
+		wps.push(new THREE.Mesh(
+		new THREE.PlaneBufferGeometry(s,s, 10, 10),
+		ms_Water.material)
+				);
+	}
+
+	for (i=0;i<n;i++) {
+		wps[i].add(ms_Water);
+		scene.add(wps[i]);
+		wps[i].position.y = -(100*(i+1))
+		wps[i].rotation.x = Math.PI * 0.5 
+
+	}
+
+
+
 }
 
 function rand_in_range(r) {
@@ -175,7 +198,7 @@ function rand() {
 	return Math.random();
 }
 
-function init_skybox() {
+function init_skybox(i) {
 	var materialArray = [];
 	/*
 	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/dawnmountain-xpos.png' ) }));
@@ -185,32 +208,52 @@ function init_skybox() {
 	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/dawnmountain-zpos.png' ) }));
 	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/dawnmountain-zneg.png' ) }));
 	*/
-	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/abstract_fog.jpg' ) }));
-	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/abstract_fog.jpg' ) }));
-	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/abstract_fog.jpg' ) }));
-	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/abstract_fog.jpg' ) }));
-	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/abstract_fog.jpg' ) }));
-	materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( 'assets/textures/abstract_fog.jpg' ) }));
+	var skybox_textures = [
+		'assets/textures/whorl.jpg',
+		'assets/textures/stone.jpg',
+		'assets/textures/grey_cloud.jpg',
+		'assets/textures/marble.jpg',
+		'assets/textures/abstract_fog.jpg'
+		]
+
+	var tex_i = reset_count % skybox_textures.length
+	for (var i = 0; i < 6; i++)
+		materialArray.push(new THREE.MeshBasicMaterial( { map: THREE.ImageUtils.loadTexture( skybox_textures[tex_i] ) }));
 	for (var i = 0; i < 6; i++)
 	 materialArray[i].side = THREE.BackSide;
 	var skyboxMaterial = new THREE.MeshFaceMaterial( materialArray );
-	var skyboxGeom = new THREE.CubeGeometry( 5000, 5000, 5000, 1, 1, 1 );
-	//var skyboxGeom = new THREE.IcosahedronGeometry( 5000, 1, 1, 1 );
+	var skyboxGeom = new THREE.CubeGeometry( 3000, 3000, 5000, 1, 1, 1 );
+	var skyboxGeom2 = new THREE.CubeGeometry( 5000, 5000, 8000, 1, 1, 1 );
+
+	if (skybox) 
+		skybox.parent.remove(skybox)
+	if (skybox2 && skybox2.parent)
+		skybox2.parent.remove(skybox2)
+
 	skybox = new THREE.Mesh( skyboxGeom, skyboxMaterial );
+	skybox2 = new THREE.Mesh( skyboxGeom2, skyboxMaterial );
+
 	scene.add( skybox );
+	//scene.add( skybox2 );
 }
 
 function init_cubes() {
 	cubes = [];
 	var r = 200;
-	var scale = chroma.scale(['red', 'green', 'blue']);
-	for(i=0; i< 600; i++) {
+	var scale = chroma.scale(['red', 'white', 'blue']);
+	var n = 0;
+	for(x=0; x< n; x++) {
+	for(y=0; y< n; y++) {
+	for(z=0; z< n; z++) {
 		var cube_mat =new THREE.MeshLambertMaterial({color: 0xfefefe, transparent:true});
+
 		cube_mat.opacity = rand()
-		var geom = new THREE.CubeGeometry( 200, 200, 200 )
-		//var geom = new THREE.IcosahedronGeometry( 200, 1, 1, 1 );
+		var geom = new THREE.CubeGeometry( 1000, 10000, 10 )
+
+		// var cube = new THREE.Mesh( geom, mirrorSphereMaterial );
 		var cube = new THREE.Mesh( geom, cube_mat );
-		var cube_pos = [rand_in_range(r), rand_in_range(r),rand_in_range(r*2)-r-30,rand(), rand(),rand()] 
+		//var cube_pos = [rand_in_range(r), rand_in_range(r),rand_in_range(r*2)-r-30,rand(), rand(),rand()] 
+		var cube_pos = [x*20,y*20,z*20]
 		cubes_pos.push(cube_pos);
 
 		cube.position.x = cube_pos[0]
@@ -218,12 +261,12 @@ function init_cubes() {
 		cube.position.z = cube_pos[2]
 		var s = .04;
 		cube.scale.set(s,s,s);
-		//setRandomColors(cube,scale);
+		setRandomColors(cube,scale);
 		scene.add( cube );
 
 		//cube.material.wireframe = true;
 		cubes.push(cube);
-	}
+	}}}
 }
 
 function setCamControls() {
@@ -260,6 +303,23 @@ function render() {
 	var delta = clock.getDelta();
 	step += 1;
 
+
+
+	// MOVE BACK CAMERA
+	camera.translateZ( (step/50 + 1.)*2 )
+	var cpos = camera.position;
+	//mirrorSphereCamera.position.set(cpos.x,cpos.y,cpos.z)
+	
+
+	// RESET CAMERA
+	if ((camera.position.distanceTo(new THREE.Vector3(0,0,0))|0)%100==0)
+		console.log(camera.position.distanceTo(new THREE.Vector3(0,0,0)))
+	if (camera.position.distanceTo(new THREE.Vector3(0,0,0)) > 30000) {
+		reset_count = reset_count+1
+		camera.position.set(0,0,0)
+		init_skybox()
+	}
+
 	if (mesh) {
 		   // mesh.rotation.y+=0.006;
 	}
@@ -271,6 +331,9 @@ function render() {
 		//cubes[i].rotation.x += cubes_pos[3]/1000.
 
 	}	
+	for( i=0; i < mirrorSpheres.length; i++) {
+		mirrorSpheres[i].rotation.x += .01;
+	}
 
 	flyControls.update(delta);
 	webGLRenderer.clear();
@@ -278,7 +341,7 @@ function render() {
 
 	//mirrorSphere.visible = false;
 	mirrorSphereCamera.updateCubeMap( webGLRenderer, scene );
-	mirrorSphere.visible = true;
+	//mirrorSphere.visible = true;
 	ms_Water.render()
 	ms_Water.material.uniforms.time.value += 1.0 / 60.0;
 	webGLRenderer.render(scene, camera)
